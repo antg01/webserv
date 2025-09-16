@@ -1,0 +1,4 @@
+#ifndef SERVER_BLOCK_HPP
+#define SERVER_BLOCK_HPP
+
+#endif // SERVER_BLOCK_HPP

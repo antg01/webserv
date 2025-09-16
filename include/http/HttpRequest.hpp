@@ -1,0 +1,4 @@
+#ifndef HTTP_REQUEST_HPP
+#define HTTP_REQUEST_HPP
+
+#endif // HTTP_REQUEST_HPP

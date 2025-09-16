@@ -1,0 +1,4 @@
+#ifndef LOCATION_BLOCK_HPP
+#define LOCATION_BLOCK_HPP
+
+#endif // LOCATION_BLOCK_HPP
