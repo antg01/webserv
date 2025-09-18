@@ -239,10 +239,3 @@ Voici une synthèse claire de **ce qu’il faut livrer** pour *webserv* (campus 
 * FDs non fermés → fuite + épuisement poller.
 
 ---
-
-Si tu veux, je peux te générer :
-
-* un **squelette d’arborescence** de projet (src/include/conf/www/cgi-bin/tests),
-* un **exemple de fichier de conf** couvrant toutes les directives,
-* une **checklist de tests curl/telnet** prête à copier-coller,
-* ou un **mini-plan de classes** (≤25 lignes par fonction) conforme à tes règles.
