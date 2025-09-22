@@ -11,7 +11,8 @@ SRC_DIR     = src
 OBJ_DIR     = obj
 
 SRC         = $(SRC_DIR)/main.cpp \
-              $(SRC_DIR)/config/ConfigParser.cpp
+              $(SRC_DIR)/config/ConfigParser.cpp \
+              $(SRC_DIR)/io/createSocket.cpp 
 
 OBJ         = $(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
