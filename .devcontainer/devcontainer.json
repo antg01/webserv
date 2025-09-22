@@ -19,7 +19,6 @@
     }
   },
   "remoteUser": "vscode",
-  "mounts": [
-    "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached"
-  ]
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
 }
+
