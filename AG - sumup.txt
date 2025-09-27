@@ -8,7 +8,7 @@
 * Chaque `server {}` → `ServerBlock` (ports, root, index, error\_pages, locations).
 * Chaque `location {}` → `LocationBlock` (methods, autoindex, upload\_store, cgi\_pass, return…).
 * Validation de la syntaxe et organisation en blocs hiérarchiques.
-* **A** utilise `listen` pour ouvrir les sockets, **B** utilise `root/index/methods` pour router les requêtes HTTP.
+* **A (Réseau)** utilise `listen` pour ouvrir les sockets, **B (HTTP/CGI)** utilise `root/index/methods` pour router les requêtes HTTP.
 
 ---
 
@@ -18,7 +18,7 @@
 * Contrôle : ports (1–65535), `root` existant, `upload_store` existant, `error_page` fichiers valides.
 * Parcourt tous les `ServerBlock` et `LocationBlock` pour détecter erreurs.
 * En cas de problème → stoppe avec un message explicite (`ValidationError`).
-* **A** et **B** peuvent utiliser la config en toute confiance (plus besoin de revalider).
+* **A (Réseau)** et **B (HTTP/CGI)** peuvent utiliser la config en toute confiance (plus besoin de revalider).
 
 ---
 
@@ -86,7 +86,7 @@
 │  4) Résout ressource (statique / autoindex / CGI / erreur)               │
 │                                                                          │
 │     ┌───────────────────────────────────────────────────────┐            │
-│     │     C — Config & Fichiers (ton module)                │            │
+│     │     C — Config & Fichiers.                            │            │
 │     │   - ConfigParser + ConfigValidator                    │            │
 │     │   - resolvePath(root, url)                            │            │
 │     │   - DirectoryResolver (index/autoindex/403)           │            │
@@ -106,16 +106,16 @@
 
 * **A (Réseau)** : ouvre les ports de `Config`, gère `poll()` et le transport d’octets (recv/send).
 * **B (HTTP/CGI)** : comprend HTTP, choisit la ressource, appelle tes utilitaires.
-* **C (toi)** : fournit la config validée + outils fichiers (resolvePath, autoindex, error pages).
+* **C (config)** : fournit la config validée + outils fichiers (resolvePath, autoindex, error pages).
 
 ---
 
 ## Mini scénario — `GET /static/` sur `site1`
 
-1. **A** reçoit des octets → place la requête dans un buffer.
-2. **B** parse : méthode=`GET`, path=`/static/`, host/port → trouve le `ServerBlock`.
-3. **B** choisit la `Location` `/static/` → lit `root`, `index`, `autoindex`.
-4. **B** appelle **C** :
+1. **A (Réseau)** reçoit des octets → place la requête dans un buffer.
+2. **B (HTTP/CGI)** parse : méthode=`GET`, path=`/static/`, host/port → trouve le `ServerBlock`.
+3. **B (HTTP/CGI)** choisit la `Location` `/static/` → lit `root`, `index`, `autoindex`.
+4. **B (HTTP/CGI)** appelle **C (config)** :
 
    * `abs = resolvePath(serverRoot|locationRoot, "/static/")`
    * `isDirectory(abs)` → oui
@@ -124,15 +124,15 @@
      * s’il y a un `index.html` → **ServeIndexFile**
      * sinon si `autoindex on` → **ServeAutoIndex** (HTML généré)
      * sinon → **Forbidden (403)**
-5. **B** construit la réponse HTTP (status + headers + body).
-6. **A** envoie la réponse sur le socket client.
+5. **B (HTTP/CGI)** construit la réponse HTTP (status + headers + body).
+6. **A (Réseau)** envoie la réponse sur le socket client.
 
 ---
 
 ## Mini scénario — `POST /upload` avec fichier
 
-1. **B** vérifie `methods` et `client_max_body_size`.
-2. **B** récupère `upload_store` dans la `Location` → écrit le fichier.
+1. **B (HTTP/CGI)** vérifie `methods` et `client_max_body_size`.
+2. **B (HTTP/CGI)** récupère `upload_store` dans la `Location` → écrit le fichier.
 3. Réponse : `201 Created` (ou `413` si trop gros), **A** l’envoie.
 
 ---
