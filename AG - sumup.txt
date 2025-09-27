@@ -1,0 +1,138 @@
+---
+
+# Configuration, Fichiers statiques & Outils
+
+### 🔹 Config Parser – résumé rapide
+
+* Lit un fichier `.conf` et construit une structure en mémoire (`Config`).
+* Chaque `server {}` → `ServerBlock` (ports, root, index, error\_pages, locations).
+* Chaque `location {}` → `LocationBlock` (methods, autoindex, upload\_store, cgi\_pass, return…).
+* Validation de la syntaxe et organisation en blocs hiérarchiques.
+* **A** utilise `listen` pour ouvrir les sockets, **B** utilise `root/index/methods` pour router les requêtes HTTP.
+
+---
+
+### 🔹 ConfigValidator – résumé rapide
+
+* Vérifie que la config est **cohérente et exploitable** avant lancement.
+* Contrôle : ports (1–65535), `root` existant, `upload_store` existant, `error_page` fichiers valides.
+* Parcourt tous les `ServerBlock` et `LocationBlock` pour détecter erreurs.
+* En cas de problème → stoppe avec un message explicite (`ValidationError`).
+* **A** et **B** peuvent utiliser la config en toute confiance (plus besoin de revalider).
+
+---
+
+### 🔹 DirectoryResolver / Autoindex – résumé rapide
+
+* Décide quoi faire quand une URL cible un **répertoire**.
+* Cherche d’abord un **index file** (ex: `index.html`).
+* Si absent → génère une page **autoindex HTML** si activé.
+* Sinon → renvoie **403 Forbidden**.
+* **B (HTTP)** l’utilise pour servir soit un fichier, soit un listing, soit une erreur.
+
+---
+
+### 🔹 Uploads – résumé rapide
+
+* Chaque `location` peut définir un dossier cible avec `upload_store`.
+* Les requêtes **POST** y sauvegardent les fichiers envoyés.
+* La taille est limitée par `client_max_body_size` (directive du serveur).
+* Si le fichier est trop gros → `413 Payload Too Large`.
+* **B (HTTP)** gère l’écriture dans `upload_store` et la réponse (`201 Created`).
+
+---
+
+### 🔹 Error Pages – résumé rapide
+
+* Chaque `server` peut mapper un code (ex: `404`) vers un fichier HTML (`error_page 404 /errors/404.html;`).
+* Les chemins sont résolus par rapport au `root` du serveur.
+* `ConfigValidator` vérifie que ces fichiers existent vraiment.
+* Si non défini → fallback sur les pages par défaut dans `www/errors/`.
+* **B (HTTP)** sert la page correspondante avec le bon code d’erreur.
+
+---
+---
+
+# **schéma ASCII** clair du flux complet entre **A (Réseau)**, **B (HTTP/CGI)** et **C (Config & Fichiers)**
+
+```
+           ┌──────────────────────────────────────────────────────┐
+           │                       Client                         │
+           │                 (browser / curl)                     │
+           └───────────────┬──────────────────────────────────────┘
+                           │ TCP
+                           ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          A — Réseau (I/O)                                │
+│  poll/select/epoll/kqueue (non-bloquant)                                 │
+│   ┌───────────────┐         ┌──────────────────────────┐                 │
+│   │ listen socket │◄────────│ cfg.collectAllListens()  │◄─────┐          │
+│   └──────┬────────┘         └──────────────────────────┘      │          │
+│          │accept()                                            │          │
+│          ▼                                                     │         │
+│   ┌───────────────┐   recv()   ┌─────────────────────────┐     │         │
+│   │ client socket │───────────►│  buffer requête HTTP    │     │         │
+│   └───────────────┘            └─────────────────────────┘     │         │
+│          ▲                               │                     │         │
+│          │send()  ◄──────────────────────┘  réponse HTTP       │         │
+└──────────┴─────────────────────────────────────────────────────┴─────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        B — HTTP & CGI                                    │
+│  1) Parse requête (méthode, path, headers, body)                         │
+│  2) Sélection Server/Location via C.Config                               │
+│  3) Applique règles: methods, return, cgi_pass, upload_store, etc.       │
+│  4) Résout ressource (statique / autoindex / CGI / erreur)               │
+│                                                                          │
+│     ┌───────────────────────────────────────────────────────┐            │
+│     │     C — Config & Fichiers (ton module)                │            │
+│     │   - ConfigParser + ConfigValidator                    │            │
+│     │   - resolvePath(root, url)                            │            │
+│     │   - DirectoryResolver (index/autoindex/403)           │            │
+│     │   - generateAutoIndex(dir, url)                       │            │
+│     │   - error_page mapping                                │            │
+│     └───────────────────────────────────────────────────────┘            │
+│        ▲                 ▲                     ▲                         │
+│        │                 │                     │                         │
+│   ServerBlock       LocationBlock          www/ , errors/                │
+│  (listen,root,…)   (methods,autoindex,…)  (contenu statique)             │
+│                                                                          │
+│  5) Construit réponse: status, headers (CL/CT), body                     │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Légende rapide
+
+* **A (Réseau)** : ouvre les ports de `Config`, gère `poll()` et le transport d’octets (recv/send).
+* **B (HTTP/CGI)** : comprend HTTP, choisit la ressource, appelle tes utilitaires.
+* **C (toi)** : fournit la config validée + outils fichiers (resolvePath, autoindex, error pages).
+
+---
+
+## Mini scénario — `GET /static/` sur `site1`
+
+1. **A** reçoit des octets → place la requête dans un buffer.
+2. **B** parse : méthode=`GET`, path=`/static/`, host/port → trouve le `ServerBlock`.
+3. **B** choisit la `Location` `/static/` → lit `root`, `index`, `autoindex`.
+4. **B** appelle **C** :
+
+   * `abs = resolvePath(serverRoot|locationRoot, "/static/")`
+   * `isDirectory(abs)` → oui
+   * `resolveDirectoryRequest(abs, "/static/", indexList, autoindexOn)`
+
+     * s’il y a un `index.html` → **ServeIndexFile**
+     * sinon si `autoindex on` → **ServeAutoIndex** (HTML généré)
+     * sinon → **Forbidden (403)**
+5. **B** construit la réponse HTTP (status + headers + body).
+6. **A** envoie la réponse sur le socket client.
+
+---
+
+## Mini scénario — `POST /upload` avec fichier
+
+1. **B** vérifie `methods` et `client_max_body_size`.
+2. **B** récupère `upload_store` dans la `Location` → écrit le fichier.
+3. Réponse : `201 Created` (ou `413` si trop gros), **A** l’envoie.
+
+---
