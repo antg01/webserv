@@ -11,7 +11,10 @@ SRC_DIR     = src
 OBJ_DIR     = obj
 
 SRC         = $(SRC_DIR)/main.cpp \
-              $(SRC_DIR)/config/ConfigParser.cpp
+              $(SRC_DIR)/config/ConfigParser.cpp \
+			  $(SRC_DIR)/config/ConfigValidator.cpp \
+			  $(SRC_DIR)/utils/DirectoryResolver.cpp \
+			  $(SRC_DIR)/utils/PathUtils.cpp
 
 OBJ         = $(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 

@@ -9,6 +9,9 @@
 #include "config/ServerBlock.hpp"
 #include "config/LocationBlock.hpp"
 #include "config/ParseError.hpp"
+#include "utils/PathUtils.hpp"
+#include "config/ConfigValidator.hpp"
+
 
 static void printServer(const ServerBlock& srv, size_t idx)
 {
@@ -103,6 +106,19 @@ static void printServer(const ServerBlock& srv, size_t idx)
 
 int main(int argc, char** argv)
 {
+    std::cout << "===== resolvePath test========" << std::endl;
+
+    std::string root = "./www/site1";
+    std::string req1 = "/static/../index.html";
+    std::string req2 = "/../../etc/passwd";
+    std::string req3 = "/images/pic.png";
+
+    std::cout << resolvePath(root, req1) << std::endl;
+    std::cout << resolvePath(root, req2) << std::endl;
+    std::cout << resolvePath(root, req3) << std::endl;
+
+    std::cout << "===== parser && port validity test========" << std::endl;
+
     // Usage: ./webserv <config_file>
     std::string path = "conf/default.conf";
     if (argc > 1) path = argv[1];
@@ -111,6 +127,9 @@ int main(int argc, char** argv)
     {
         ConfigParser parser;
         Config cfg = parser.parseFile(path);
+
+        // test ports validity !!
+        // ConfigValidator::validate(cfg, "");
 
         const std::vector<ServerBlock>& servers = cfg.getServers();
         if (servers.empty())
